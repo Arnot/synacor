@@ -2,71 +2,20 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include "stack.h"
+#include "cpu.h"
 
-unsigned long cycle_count;
-
-/********************
- * Memory areas
- ********************/
 // 8 registers are in upper part of memory
 uint16_t memory[32768+8] = {0};
 uint16_t* reg = &memory[32768];
 
-void memory_print()
-{
-  int i, j;
-  printf("\n");
-  for (i = 0; i < 1024; i++) {
-    for (j = 0; j < 32; j++) {
-      printf("%u ", memory[j+i*32]);
-    }
-    printf("\n");
-  }
-}
-
-void register_print()
-{
-  int i;
-  for (i = 0; i < 8; i++) {
-    printf("reg %d: %u\n", i, reg[i]);
-  }
-}
-
-uint32_t read_block(FILE* p)
-{
-  // Need ints to check for EOF
-  int low, high;
-  char lo, hi;
-  uint16_t value;
-
-  low = fgetc(p);
-  high = fgetc(p);
-  lo = (char)low;
-  hi = (char)high;
-  if (!(low == EOF || high == EOF))
-    {
-      value = ((hi << 8) | lo) % 32768;
-    } else {
-    printf("\nEOF found\n");
-    return 0xFFFFFFFF;
-  }
-
-  if (value < 32776)
-    return value;
-  else {
-    printf("Invalid value! Using 0. Value was %u. Cycle %lu\n", value, cycle_count);
-    printf("lo: %x; hi: %x\n", lo, hi);
-    return 0;
-  }
-}
+unsigned long cycle_count;
 
 int main(int argc, char* argv[])
 {
   FILE* program;
   int halted = 0;
   uint16_t opcode;
-  uint16_t a, b, c;
-  int tmp;
+  int ret;
 
   cycle_count = 0;
 
@@ -96,96 +45,63 @@ int main(int argc, char* argv[])
       break;
 
     case 1: // set
-      a = read_block(program);
-      b = read_block(program);
-      reg[a] = b;
+      instr_set(program);
       break;
 
     case 2: // push
-      a = read_block(program);
-      stack_push(a);
+      instr_push(program);
       break;
 
     case 3: // pop
-      a = read_block(program);
-      tmp = stack_pop();
-      if (tmp < 0) {
-        printf("Popped empty stack!\n");
-        return 1;
+      ret = instr_pop(program);
+      if (ret != 0) {
+        printf("Trying to pop empty stack!\n");
+        halted = 1;
       }
-      memory[a] = tmp;
       break;
 
     case 4: // eq
-      a = read_block(program);
-      b = read_block(program);
-      c = read_block(program);
-      memory[a] = (b == c);
+      instr_eq(program);
       break;
 
     case 5: // gt
-      a = read_block(program);
-      b = read_block(program);
-      c = read_block(program);
-      memory[a] = (b > c);
+      instr_gt(program);
       break;
 
     case 9: // add
-      a = read_block(program);
-      b = read_block(program);
-      c = read_block(program);
-      memory[a] = (b + c) % 32768;
+      instr_add(program);
       break;
 
     case 10: // mult
-      a = read_block(program);
-      b = read_block(program);
-      c = read_block(program);
-      memory[a] = (b * c) % 32768;
+      instr_mult(program);
       break;
 
     case 11: // mod
-      a = read_block(program);
-      b = read_block(program);
-      c = read_block(program);
-      memory[a] = (b % c);
+      instr_mod(program);
       break;
 
     case 12: // and
-      a = read_block(program);
-      b = read_block(program);
-      c = read_block(program);
-      memory[a] = (b & c);
+      instr_and(program);
       break;
 
     case 13: // or
-      a = read_block(program);
-      b = read_block(program);
-      c = read_block(program);
-      memory[a] = (b | c);
+      instr_or(program);
       break;
 
     case 14: // not
-      a = read_block(program);
-      b = read_block(program);
-      memory[a] = ~(b & 0x7FFF);
+      instr_not(program);
       break;
 
-    case 15: // rmem --> Same as wmem?
-      a = read_block(program);
-      b = read_block(program);
-      memory[a] = memory[b];
+    case 15: // rmem
+      instr_rmem(program);
       break;
 
     case 16: // wmem
-      a = read_block(program);
-      b = read_block(program);
-      memory[a] = memory[b];
+      instr_wmem(program);
       break;
 
     case 19: //out
-      a = read_block(program);
-      printf("%c", a);
+      instr_out(program);
       break;
 
     case 21: // noop
@@ -198,7 +114,7 @@ int main(int argc, char* argv[])
     }
   }
 
-  //  memory_print();
+  memory_print();
   register_print();
   printf("\n\nCycle count = %lu\n", cycle_count);
   fclose(program);
