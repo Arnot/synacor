@@ -1,15 +1,14 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 
-#define STACK_MIN_SIZE 16
-/*
+#define STACK_MIN_SIZE 32
+
+/********************
  * Memory areas
- */
-// 15-bit addressed main memory
-int main_mem[32768];
-// Registers
-int reg[8];
-// Stack
+ ********************/
+uint16_t main_mem[32768];
+uint16_t reg[8];
 struct Stack {
   int* data;
   int size;
@@ -22,7 +21,7 @@ int stack_init()
   stack.data = malloc(STACK_MIN_SIZE*sizeof(*stack.data));
 
   if (stack.data != NULL) {
-    stack.max_size = 8;
+    stack.max_size = STACK_MIN_SIZE;
     return 0;
   } else {
     stack.max_size = 0;
@@ -94,26 +93,66 @@ void stack_print()
   printf("\n");
 }
 
+uint16_t read_block(FILE* p)
+{
+  char lo, hi;
+  lo = fgetc(p);
+  hi = fgetc(p);
+  return ((hi << 8) | lo) % 32768;
+}
+
 int main(int argc, char* argv[])
 {
-  int i;
-  int ret;
-  ret = stack_init();
-  if (ret != 0) {
+  unsigned long cycle_count;
+  FILE* program;
+  int halted = 0;
+  uint16_t opcode;
+  uint16_t a, b;
+
+  cycle_count = 0;
+  if (stack_init() != 0) {
     printf("Failed to initialize stack.\n");
     return 1;
   }
 
-  for (i = 0; i < 10000; i++){
-    //    printf("Pushing %d\n", stack.size);
-    stack_push(stack.size);
+  if (argc < 2) {
+    printf("Too little command line arguments\n");
+    return 1;
   }
 
-  //stack_print();
+  program = fopen(argv[1], "rb");
+  if (program == NULL) {
+    printf("Couldn't open challenge.bin for reading\n");
+    exit(1);
+  }
 
-  for (i = 0; i < 10000; i++)
-    stack_pop();
+  while (!halted) {
+    cycle_count++;
+    opcode = read_block(program);
+    switch (opcode) {
+    // halt
+    case 0: //printf("\nhalt\n");
+            halted = 1;
+            break;
 
+    //out
+    case 19: //printf("\nout\n");
+             a = read_block(program);
+             printf("%c", a);
+             break;
+
+    // noop
+    case 21: //printf("\nnoop\n");
+             break;
+
+    default: printf("\nUnidentified opcode or EOF, halting\n");
+             halted = 1;
+             break;
+    }
+  }
+
+  printf("\n\nCycle count = %lu\n", cycle_count);
+  fclose(program);
   stack_destroy();
   return 0;
 }
