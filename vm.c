@@ -9,8 +9,9 @@ unsigned long cycle_count;
 /********************
  * Memory areas
  ********************/
+// 8 registers are in upper part of memory
 uint16_t memory[32768+8] = {0};
-uint16_t* reg;
+uint16_t* reg = &memory[32768];
 struct Stack {
   int* data;
   int size;
@@ -69,6 +70,8 @@ int stack_pop()
   if (stack.size > 0) {
     ret = stack.data[stack.size - 1];
     stack.size--;
+  } else {
+    ret = -1;
   }
 
   if (stack.size < stack.max_size/2 && stack.size >= STACK_MIN_SIZE) {
@@ -130,15 +133,12 @@ uint32_t read_block(FILE* p)
     {
       value = ((hi << 8) | lo) % 32768;
     } else {
-    printf("EOF found\n");
-    return 0xFFFF;
+    printf("\nEOF found\n");
+    return 0xFFFFFFFF;
   }
 
-  if (value < 32768)
+  if (value < 32776)
     return value;
-  else if (value >= 32768 && value <= 32775)
-    // Value from register
-    return memory[value];
   else {
     printf("Invalid value! Using 0. Value was %u. Cycle %lu\n", value, cycle_count);
     printf("lo: %x; hi: %x\n", lo, hi);
@@ -152,18 +152,17 @@ int main(int argc, char* argv[])
   int halted = 0;
   uint16_t opcode;
   uint16_t a, b, c;
+  int tmp;
 
-  // Registers are in upper part of memory
-  reg = &memory[32768];
   cycle_count = 0;
-
-  if (stack_init() != 0) {
-    printf("Failed to initialize stack.\n");
-    return 1;
-  }
 
   if (argc < 2) {
     printf("Too little command line arguments\n");
+    return 1;
+  }
+
+  if (stack_init() != 0) {
+    printf("Failed to initialize stack.\n");
     return 1;
   }
 
@@ -176,18 +175,98 @@ int main(int argc, char* argv[])
   while (!halted) {
     cycle_count++;
     opcode = read_block(program);
-    printf("opcode: %u\n", opcode);
+    //printf("opcode: %u\n", opcode);
     switch (opcode) {
     case 0: // halt
       halted = 1;
+      break;
+
+    case 1: // set
+      a = read_block(program);
+      b = read_block(program);
+      reg[a] = b;
+      break;
+
+    case 2: // push
+      a = read_block(program);
+      stack_push(a);
+      break;
+
+    case 3: // pop
+      a = read_block(program);
+      tmp = stack_pop();
+      if (tmp < 0) {
+        printf("Popped empty stack!\n");
+        return 1;
+      }
+      memory[a] = tmp;
+      break;
+
+    case 4: // eq
+      a = read_block(program);
+      b = read_block(program);
+      c = read_block(program);
+      memory[a] = (b == c);
+      break;
+
+    case 5: // gt
+      a = read_block(program);
+      b = read_block(program);
+      c = read_block(program);
+      memory[a] = (b > c);
       break;
 
     case 9: // add
       a = read_block(program);
       b = read_block(program);
       c = read_block(program);
-      printf("add: a: %u; b: %u; c: %u\n", a, b, c);
-      reg[a] = (b + c) % 32768;
+      memory[a] = (b + c) % 32768;
+      break;
+
+    case 10: // mult
+      a = read_block(program);
+      b = read_block(program);
+      c = read_block(program);
+      memory[a] = (b * c) % 32768;
+      break;
+
+    case 11: // mod
+      a = read_block(program);
+      b = read_block(program);
+      c = read_block(program);
+      memory[a] = (b % c);
+      break;
+
+    case 12: // and
+      a = read_block(program);
+      b = read_block(program);
+      c = read_block(program);
+      memory[a] = (b & c);
+      break;
+
+    case 13: // or
+      a = read_block(program);
+      b = read_block(program);
+      c = read_block(program);
+      memory[a] = (b | c);
+      break;
+
+    case 14: // not
+      a = read_block(program);
+      b = read_block(program);
+      memory[a] = ~(b & 0x7FFF);
+      break;
+
+    case 15: // rmem --> Same as wmem?
+      a = read_block(program);
+      b = read_block(program);
+      memory[a] = memory[b];
+      break;
+
+    case 16: // wmem
+      a = read_block(program);
+      b = read_block(program);
+      memory[a] = memory[b];
       break;
 
     case 19: //out
