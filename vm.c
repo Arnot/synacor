@@ -4,11 +4,13 @@
 
 #define STACK_MIN_SIZE 32
 
+unsigned long cycle_count;
+
 /********************
  * Memory areas
  ********************/
-uint16_t main_mem[32768];
-uint16_t reg[8];
+uint16_t memory[32768+8] = {0};
+uint16_t* reg;
 struct Stack {
   int* data;
   int size;
@@ -93,23 +95,68 @@ void stack_print()
   printf("\n");
 }
 
-uint16_t read_block(FILE* p)
+void memory_print()
 {
+  int i, j;
+  printf("\n");
+  for (i = 0; i < 1024; i++) {
+    for (j = 0; j < 32; j++) {
+      printf("%u ", memory[j+i*32]);
+    }
+    printf("\n");
+  }
+}
+
+void register_print()
+{
+  int i;
+  for (i = 0; i < 8; i++) {
+    printf("reg %d: %u\n", i, reg[i]);
+  }
+}
+
+uint32_t read_block(FILE* p)
+{
+  // Need ints to check for EOF
+  int low, high;
   char lo, hi;
-  lo = fgetc(p);
-  hi = fgetc(p);
-  return ((hi << 8) | lo) % 32768;
+  uint16_t value;
+
+  low = fgetc(p);
+  high = fgetc(p);
+  lo = (char)low;
+  hi = (char)high;
+  if (!(low == EOF || high == EOF))
+    {
+      value = ((hi << 8) | lo) % 32768;
+    } else {
+    printf("EOF found\n");
+    return 0xFFFF;
+  }
+
+  if (value < 32768)
+    return value;
+  else if (value >= 32768 && value <= 32775)
+    // Value from register
+    return memory[value];
+  else {
+    printf("Invalid value! Using 0. Value was %u. Cycle %lu\n", value, cycle_count);
+    printf("lo: %x; hi: %x\n", lo, hi);
+    return 0;
+  }
 }
 
 int main(int argc, char* argv[])
 {
-  unsigned long cycle_count;
   FILE* program;
   int halted = 0;
   uint16_t opcode;
-  uint16_t a, b;
+  uint16_t a, b, c;
 
+  // Registers are in upper part of memory
+  reg = &memory[32768];
   cycle_count = 0;
+
   if (stack_init() != 0) {
     printf("Failed to initialize stack.\n");
     return 1;
@@ -122,35 +169,44 @@ int main(int argc, char* argv[])
 
   program = fopen(argv[1], "rb");
   if (program == NULL) {
-    printf("Couldn't open challenge.bin for reading\n");
+    printf("Couldn't open %s for reading\n", argv[1]);
     exit(1);
   }
 
   while (!halted) {
     cycle_count++;
     opcode = read_block(program);
+    printf("opcode: %u\n", opcode);
     switch (opcode) {
-    // halt
-    case 0: //printf("\nhalt\n");
-            halted = 1;
-            break;
+    case 0: // halt
+      halted = 1;
+      break;
 
-    //out
-    case 19: //printf("\nout\n");
-             a = read_block(program);
-             printf("%c", a);
-             break;
+    case 9: // add
+      a = read_block(program);
+      b = read_block(program);
+      c = read_block(program);
+      printf("add: a: %u; b: %u; c: %u\n", a, b, c);
+      reg[a] = (b + c) % 32768;
+      break;
 
-    // noop
-    case 21: //printf("\nnoop\n");
-             break;
+    case 19: //out
+      a = read_block(program);
+      printf("%c", a);
+      break;
 
-    default: printf("\nUnidentified opcode or EOF, halting\n");
-             halted = 1;
-             break;
+    case 21: // noop
+      break;
+
+    default:
+      printf("\nUnidentified opcode (%u) or EOF, halting\n", opcode);
+      halted = 1;
+      break;
     }
   }
 
+  //  memory_print();
+  register_print();
   printf("\n\nCycle count = %lu\n", cycle_count);
   fclose(program);
   stack_destroy();
