@@ -18,6 +18,8 @@ int instr_pop(FILE* p);
 void instr_eq(FILE* p);
 void instr_gt(FILE* p);
 void instr_jmp(FILE* p);
+void instr_jt(FILE* p);
+void instr_jf(FILE* p);
 void instr_add(FILE* p);
 void instr_mult(FILE* p);
 void instr_mod(FILE* p);
