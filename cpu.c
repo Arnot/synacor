@@ -10,10 +10,8 @@ uint32_t read_block(FILE* p)
 
   low = fgetc(p);
   high = fgetc(p);
-  lo = (char)low;
-  hi = (char)high;
-  if (!(low == EOF || high == EOF)) {
-    value = ((hi << 8) | lo) % 32768;
+  if (!(low > 255 || high > 255)) {
+    value = ((high << 8) | low) % 32768;
   } else {
     printf("\nEOF found\n");
     return 0xFFFFFFFF;
@@ -23,13 +21,14 @@ uint32_t read_block(FILE* p)
     return value;
   else {
     printf("Invalid value! Using 0. Value was %u. Cycle %lu\n", value, cycle_count);
-    printf("lo: %x; hi: %x\n", lo, hi);
+    printf("low: %x; high: %x\n", low, high);
+    printf("File pointer was at %lx\n", ftell(p));
     return 0;
   }
 }
 
 // Source operands need extra checking, as they can also come from registers
-uint32_t read_source(FILE* p)
+uint32_t read_src(FILE* p)
 {
   uint32_t raw = read_block(p);
   // Check if it's a value from a register
@@ -48,13 +47,13 @@ uint32_t read_dest(FILE* p)
 void instr_set(FILE* p) {
   uint16_t a, b;
   a = read_dest(p);
-  b = read_source(p);
+  b = read_src(p);
   memory[a] = b;
 }
 
 void instr_push(FILE* p) {
   uint16_t a;
-  a = read_source(p);
+  a = read_src(p);
   stack_push(a);
 }
 
@@ -73,84 +72,127 @@ int instr_pop(FILE* p) {
 void instr_eq(FILE* p) {
   uint16_t a, b, c;
   a = read_dest(p);
-  b = read_source(p);
-  c = read_source(p);
+  b = read_src(p);
+  c = read_src(p);
   memory[a] = (b == c);
 }
 
 void instr_gt(FILE* p) {
   uint16_t a, b, c;
   a = read_dest(p);
-  b = read_source(p);
-  c = read_source(p);
+  b = read_src(p);
+  c = read_src(p);
   memory[a] = (b > c);
+}
+
+void instr_jmp(FILE* p) {
+  uint16_t a;
+  int ret;
+  /*
+   * Although a is the destination of the jump, it is a 'source' for this
+   * instruction
+   */
+  a = read_src(p);
+  ret = fseek(p, a*2, SEEK_SET);
+  if (ret != 0) {
+    printf("Jumped out of file!\n");
+    exit(1);
+  }
+}
+
+void instr_jt(FILE* p) {
+  uint16_t a, b;
+  int ret;
+  a = read_src(p);
+  b = read_src(p);
+  if (a != 0) {
+    ret = fseek(p, b*2, SEEK_SET);
+    if (ret != 0) {
+      printf("Jumped out of file!\n");
+      exit(1);
+    }
+  }
+}
+
+void instr_jf(FILE* p) {
+  uint16_t a, b;
+  int ret;
+  a = read_src(p);
+  b = read_src(p);
+  if (a == 0) {
+    ret = fseek(p, b*2, SEEK_SET);
+    if (ret != 0) {
+      printf("Jumped out of file!\n");
+      exit(1);
+    }
+  }
 }
 
 void instr_add(FILE* p) {
   uint16_t a, b, c;
   a = read_dest(p);
-  b = read_source(p);
-  c = read_source(p);
-    printf("reg[%u] = %u + %u\n", a, b, c);
+  b = read_src(p);
+  c = read_src(p);
+  // printf("reg[%u] = %u + %u\n", a, b, c);
   reg[a] = (b + c) % 32768;
 }
 
 void instr_mult(FILE* p) {
   uint16_t a, b, c;
   a = read_dest(p);
-  b = read_source(p);
-  c = read_source(p);
+  b = read_src(p);
+  c = read_src(p);
   memory[a] = (b * c) % 32768;
 }
 
 void instr_mod(FILE* p) {
   uint16_t a, b, c;
   a = read_dest(p);
-  b = read_source(p);
-  c = read_source(p);
+  b = read_src(p);
+  c = read_src(p);
   memory[a] = (b % c);
 }
 
 void instr_and(FILE* p) {
   uint16_t a, b, c;
   a = read_dest(p);
-  b = read_source(p);
-  c = read_source(p);
+  b = read_src(p);
+  c = read_src(p);
   memory[a] = (b & c);
 }
 
 void instr_or(FILE* p) {
   uint16_t a, b, c;
   a = read_dest(p);
-  b = read_source(p);
-  c = read_source(p);
+  b = read_src(p);
+  c = read_src(p);
   memory[a] = (b | c);
 }
 
 void instr_not(FILE* p) {
   uint16_t a, b;
   a = read_dest(p);
-  b = read_source(p);
+  b = read_src(p);
   memory[a] = ~(b & 0x7FFF);
 }
 
 void instr_rmem(FILE* p) {
   uint16_t a, b;
   a = read_dest(p);
-  b = read_source(p);
+  b = read_src(p);
   memory[a] = memory[b];
 }
 
 void instr_wmem(FILE* p) {
   uint16_t a, b;
   a = read_dest(p);
-  b = read_source(p);
-  memory[a] = memory[b];
+  b = read_src(p);
+  memory[a] = b;
 }
 
 void instr_out(FILE* p) {
   uint16_t a;
-  a = read_source(p);
+  a = read_src(p);
   printf("%c", a);
 }
 

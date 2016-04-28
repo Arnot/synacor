@@ -68,6 +68,18 @@ int main(int argc, char* argv[])
       instr_gt(program);
       break;
 
+    case 6: // jmp
+      instr_jmp(program);
+      break;
+
+    case 7:
+      instr_jt(program);
+      break;
+
+    case 8:
+      instr_jf(program);
+      break;
+
     case 9: // add
       instr_add(program);
       break;
@@ -114,7 +126,7 @@ int main(int argc, char* argv[])
     }
   }
 
-  memory_print();
+//  memory_print();
   register_print();
   printf("\n\nCycle count = %lu\n", cycle_count);
   fclose(program);
