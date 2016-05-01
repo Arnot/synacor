@@ -37,6 +37,7 @@ void instr_wmem();
 void instr_call();
 void instr_ret();
 void instr_out();
+void instr_in();
 void instr_noop(); //21
 
 void memory_print();

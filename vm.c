@@ -8,13 +8,12 @@
 uint32_t pc;
 
 uint16_t memory[MEM_REG_SIZE] = {0};
-uint16_t* reg = &memory[MEM_SIZE];
+uint16_t *reg = &memory[MEM_SIZE];
 
 unsigned long cycle_count;
 
-int main(int argc, char* argv[])
-{
-  FILE* program;
+int main(int argc, char *argv[]) {
+  FILE *program;
   int halted = 0;
   uint16_t opcode;
   int ret, i;
@@ -40,7 +39,7 @@ int main(int argc, char* argv[])
   uint32_t block;
   int mem_pos = 0;
   while ((block = read_block(program)) <= MEM_REG_SIZE && mem_pos < MEM_SIZE) {
-    memory[mem_pos] = (uint16_t) block;
+    memory[mem_pos] = (uint16_t)block;
     mem_pos++;
   }
   fclose(program);
@@ -134,11 +133,16 @@ int main(int argc, char* argv[])
       instr_ret();
       break;
 
-    case 19: //out
+    case 19: // out
       instr_out();
       break;
 
+    case 20: // in
+      instr_in();
+      break;
+
     case 21: // noop
+      instr_noop();
       break;
 
     default:
@@ -154,13 +158,14 @@ int main(int argc, char* argv[])
 
   printf("Cycle count = %lu\n", cycle_count);
   printf("Program counter was at %x\n", pc);
-  printf("Context: \n");
-  for (i = pc - 12; i < pc + 12; i++)
-    printf("%4x ", i);
-  printf("\n");
-  for (i = pc - 12; i < pc + 12; i++)
-    printf("%4x ", memory[i]);
-  printf("\n");
+
+  /* printf("Context: \n"); */
+  /* for (i = pc - 12; i < pc + 12; i++) */
+  /*   printf("%4x ", i); */
+  /* printf("\n"); */
+  /* for (i = pc - 12; i < pc + 12; i++) */
+  /*   printf("%4x ", memory[i]); */
+  /* printf("\n"); */
 
   stack_destroy();
   return 0;

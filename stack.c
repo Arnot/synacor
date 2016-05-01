@@ -28,7 +28,7 @@ int stack_push(uint16_t value)
 {
   uint16_t* new_data;
 
-  printf("Adding %x (%d) to stack.\n", value, value);
+  /* printf("Adding %x (%d) to stack.\n", value, value); */
   // resize stack if size exceeds max_size
   if (stack.size == stack.max_size) {
     printf("Growing stack..\n");
@@ -71,7 +71,7 @@ uint16_t stack_pop()
     stack.data = new_data;
     stack.max_size = stack.max_size/2;
   }
-  printf("Popping %x (%d) from stack.\n", ret, ret);
+  /* printf("Popping %x (%d) from stack.\n", ret, ret); */
 
   return ret;
 }
