@@ -3,63 +3,65 @@
 
 uint32_t read_block(FILE* p)
 {
-  // Need ints to check for EOF
-  int low, high;
-  char lo, hi;
+  int lo, hi;
   uint16_t value;
 
-  low = fgetc(p);
-  high = fgetc(p);
-  if (!(low > 255 || high > 255)) {
-    value = ((high << 8) | low) % 32768;
+  lo = fgetc(p);
+  hi = fgetc(p);
+  if (!(lo > 255 || hi > 255)) {
+    value = ((hi << 8) | lo) & 0xFFFF;
   } else {
     printf("\nEOF found\n");
     return 0xFFFFFFFF;
   }
 
-  if (value < 32776)
-    return value;
-  else {
-    printf("Invalid value! Using 0. Value was %u. Cycle %lu\n", value, cycle_count);
-    printf("low: %x; high: %x\n", low, high);
-    printf("File pointer was at %lx\n", ftell(p));
-    return 0;
-  }
+  return value;
 }
 
 // Source operands need extra checking, as they can also come from registers
-uint32_t read_src(FILE* p)
+uint32_t read_src()
 {
-  uint32_t raw = read_block(p);
+  uint32_t raw = memory[pc];
+
+  pc++;
   // Check if it's a value from a register
   if (raw >= 32768 && raw < 32776) {
     return memory[raw];
-  } else {
+  } else if (raw < 32768){
     return raw;
+  } else {
+    /* Invalid value */
+    return 0xFFFFFFFF;
   }
 }
 
-uint32_t read_dest(FILE* p)
+uint32_t read_dest()
 {
-  return read_block(p);
+  uint32_t value = memory[pc];
+
+  pc++;
+  if (value > 32776)
+    return 0xFFFFFFFF;
+  else
+    return value;
 }
 
-void instr_set(FILE* p) {
+void instr_set() {
   uint16_t a, b;
-  a = read_dest(p);
-  b = read_src(p);
+  a = read_dest();
+  b = read_src();
   memory[a] = b;
 }
 
-void instr_push(FILE* p) {
+void instr_push() {
   uint16_t a;
-  a = read_src(p);
+  a = read_src();
   stack_push(a);
 }
 
-int instr_pop(FILE* p) {
+int instr_pop() {
   uint16_t a, tmp;
-  a = read_dest(p);
+  a = read_dest();
   tmp = stack_pop();
   if (tmp < 0) {
     printf("Popped empty stack!\n");
@@ -69,134 +71,134 @@ int instr_pop(FILE* p) {
   return 0;
 }
 
-void instr_eq(FILE* p) {
+void instr_eq() {
   uint16_t a, b, c;
-  a = read_dest(p);
-  b = read_src(p);
-  c = read_src(p);
+  a = read_dest();
+  b = read_src();
+  c = read_src();
+  printf("eq - %x == %x at addr 0x%x\n", b, c, pc-8);
   memory[a] = (b == c);
 }
 
-void instr_gt(FILE* p) {
+void instr_gt() {
   uint16_t a, b, c;
-  a = read_dest(p);
-  b = read_src(p);
-  c = read_src(p);
+  a = read_dest();
+  b = read_src();
+  c = read_src();
   memory[a] = (b > c);
 }
 
-void instr_jmp(FILE* p) {
+void instr_jmp() {
   uint16_t a;
-  int ret;
-  /*
-   * Although a is the destination of the jump, it is a 'source' for this
-   * instruction
-   */
-  a = read_src(p);
-  ret = fseek(p, a*2, SEEK_SET);
-  if (ret != 0) {
-    printf("Jumped out of file!\n");
-    exit(1);
-  }
+  a = read_src();
+  printf("jumping from %x to %x\n", pc, a);
+  pc = a;
 }
 
-void instr_jt(FILE* p) {
+void instr_jt() {
   uint16_t a, b;
-  int ret;
-  a = read_src(p);
-  b = read_src(p);
+  a = read_src();
+  b = read_src();
   if (a != 0) {
-    ret = fseek(p, b*2, SEEK_SET);
-    if (ret != 0) {
-      printf("Jumped out of file!\n");
-      exit(1);
-    }
+    printf("jt'ing from %x to %x, a = %d\n", pc, b, a);
+    pc = b;
   }
 }
 
-void instr_jf(FILE* p) {
+void instr_jf() {
   uint16_t a, b;
-  int ret;
-  a = read_src(p);
-  b = read_src(p);
+  a = read_src();
+  b = read_src();
   if (a == 0) {
-    ret = fseek(p, b*2, SEEK_SET);
-    if (ret != 0) {
-      printf("Jumped out of file!\n");
-      exit(1);
-    }
+    printf("jf'ing from %x to %x, a = %d\n", pc, b, a);
+    pc = b;
   }
 }
 
-void instr_add(FILE* p) {
+void instr_add() {
   uint16_t a, b, c;
-  a = read_dest(p);
-  b = read_src(p);
-  c = read_src(p);
-  // printf("reg[%u] = %u + %u\n", a, b, c);
-  reg[a] = (b + c) % 32768;
+  a = read_dest();
+  b = read_src();
+  c = read_src();
+  memory[a] = (b + c) % 32768;
 }
 
-void instr_mult(FILE* p) {
+void instr_mult() {
   uint16_t a, b, c;
-  a = read_dest(p);
-  b = read_src(p);
-  c = read_src(p);
+  a = read_dest();
+  b = read_src();
+  c = read_src();
   memory[a] = (b * c) % 32768;
 }
 
-void instr_mod(FILE* p) {
+void instr_mod() {
   uint16_t a, b, c;
-  a = read_dest(p);
-  b = read_src(p);
-  c = read_src(p);
+  a = read_dest();
+  b = read_src();
+  c = read_src();
   memory[a] = (b % c);
 }
 
-void instr_and(FILE* p) {
+void instr_and() {
   uint16_t a, b, c;
-  a = read_dest(p);
-  b = read_src(p);
-  c = read_src(p);
-  memory[a] = (b & c);
+  a = read_dest();
+  b = read_src();
+  c = read_src();
+  memory[a] = (b & c) % 32768;
 }
 
-void instr_or(FILE* p) {
+void instr_or() {
   uint16_t a, b, c;
-  a = read_dest(p);
-  b = read_src(p);
-  c = read_src(p);
-  memory[a] = (b | c);
+  a = read_dest();
+  b = read_src();
+  c = read_src();
+  memory[a] = (b | c) % 32768;
 }
 
-void instr_not(FILE* p) {
+void instr_not() {
   uint16_t a, b;
-  a = read_dest(p);
-  b = read_src(p);
-  memory[a] = ~(b & 0x7FFF);
+  a = read_dest();
+  b = read_src();
+  memory[a] = ~b & 0x7FFF;
 }
 
-void instr_rmem(FILE* p) {
+void instr_rmem() {
   uint16_t a, b;
-  a = read_dest(p);
-  b = read_src(p);
+  a = read_dest();
+  b = read_src();
   memory[a] = memory[b];
+  printf("rmem: memory[0x%x] = memory[0x%x] (= %x)\n", a, b, memory[b]);
 }
 
-void instr_wmem(FILE* p) {
+void instr_wmem() {
   uint16_t a, b;
-  a = read_dest(p);
-  b = read_src(p);
+  a = read_dest();
+  b = read_src();
   memory[a] = b;
 }
 
-void instr_out(FILE* p) {
+void instr_call() {
   uint16_t a;
-  a = read_src(p);
+  a = read_src();
+  printf("Pushing 0x%x to the stack, jumping to 0x%x\n", pc, a);
+  stack_push(pc);
+  pc = a;
+}
+
+void instr_ret() {
+  uint16_t addr;
+  addr = stack_pop();
+  printf("returning to addr 0x%x\n", addr);
+  pc = addr;
+}
+
+void instr_out() {
+  uint16_t a;
+  a = read_src();
   printf("%c", a);
 }
 
-void instr_noop(FILE* p) {
+void instr_noop() {
 
 }
 
@@ -204,9 +206,9 @@ void memory_print()
 {
   int i, j;
   printf("\n");
-  for (i = 0; i < 1024; i++) {
-    for (j = 0; j < 32; j++) {
-      printf("%u ", memory[j+i*32]);
+  for (i = 0; i < 2048; i++) {
+    for (j = 0; j < 16; j++) {
+      printf("%4x ", memory[j+i*32]);
     }
     printf("\n");
   }
@@ -216,6 +218,6 @@ void register_print()
 {
   int i;
   for (i = 0; i < 8; i++) {
-    printf("reg %d: %u\n", i, reg[i]);
+    printf("reg %d: %u (%x)\n", i, reg[i], reg[i]);
   }
 }

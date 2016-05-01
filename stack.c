@@ -1,4 +1,3 @@
-
 #include "stack.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -25,10 +24,11 @@ void stack_destroy()
   stack.size = 0;
 }
 
-int stack_push(int value)
+int stack_push(uint16_t value)
 {
-  int* new_data;
+  uint16_t* new_data;
 
+  printf("Adding %x (%d) to stack.\n", value, value);
   // resize stack if size exceeds max_size
   if (stack.size == stack.max_size) {
     printf("Growing stack..\n");
@@ -48,10 +48,10 @@ int stack_push(int value)
   return 0;
 }
 
-int stack_pop()
+uint16_t stack_pop()
 {
-  int *new_data;
-  int ret = 0;
+  uint16_t *new_data;
+  uint16_t ret = 0;
 
   if (stack.size > 0) {
     ret = stack.data[stack.size - 1];
@@ -71,6 +71,7 @@ int stack_pop()
     stack.data = new_data;
     stack.max_size = stack.max_size/2;
   }
+  printf("Popping %x (%d) from stack.\n", ret, ret);
 
   return ret;
 }
@@ -79,6 +80,7 @@ void stack_print()
 {
   int i;
 
+  printf("Stack size is %d\n", stack.size);
   for (i = 0; i < stack.size; i++)
     printf("%d ", stack.data[i]);
   printf("\n");
