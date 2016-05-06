@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <time.h>
 #include "stack.h"
 #include "cpu.h"
 
@@ -12,11 +13,18 @@ uint16_t *reg = &memory[MEM_SIZE];
 
 unsigned long cycle_count;
 
+void memory_dump() {
+  FILE* output;
+  output = fopen("memdump.bin", "wb");
+  fwrite(memory, 2, MEM_SIZE, output);
+  fclose(output);
+}
+
 int main(int argc, char *argv[]) {
   FILE *program;
   int halted = 0;
   uint16_t opcode;
-  int ret, i;
+  int ret;
 
   cycle_count = 0;
 
@@ -50,6 +58,7 @@ int main(int argc, char *argv[]) {
 
   while (!halted) {
     cycle_count++;
+
     opcode = memory[pc];
     pc++;
     switch (opcode) {
@@ -138,6 +147,8 @@ int main(int argc, char *argv[]) {
       break;
 
     case 20: // in
+      /* memory_dump(); */
+      /* stack_print(); */
       instr_in();
       break;
 
@@ -158,14 +169,6 @@ int main(int argc, char *argv[]) {
 
   printf("Cycle count = %lu\n", cycle_count);
   printf("Program counter was at %x\n", pc);
-
-  /* printf("Context: \n"); */
-  /* for (i = pc - 12; i < pc + 12; i++) */
-  /*   printf("%4x ", i); */
-  /* printf("\n"); */
-  /* for (i = pc - 12; i < pc + 12; i++) */
-  /*   printf("%4x ", memory[i]); */
-  /* printf("\n"); */
 
   stack_destroy();
   return 0;

@@ -82,6 +82,9 @@ void stack_print()
 
   printf("Stack size is %d\n", stack.size);
   for (i = 0; i < stack.size; i++)
-    printf("%d ", stack.data[i]);
+    printf("%4d ", i);
+  printf("\n");
+  for (i = 0; i < stack.size; i++)
+    printf("%4x ", stack.data[i]);
   printf("\n");
 }
